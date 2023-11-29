@@ -1,4 +1,4 @@
-# ansible-playbook playbook.yaml -u johan --inventory 192.0.2.254, --ask-pass --ask-become-pass --extra-vars "ssh_ip=192.0.2.1"
+# ansible-playbook playbook.yaml -u johan --inventory 192.0.2.254, --ask-pass --ask-become-pass
 ---
 - name: Initial Setup (Debian)
   gather_facts: yes
@@ -6,6 +6,11 @@
   become: yes
   become_user: root
   become_method: su
+
+  vars_prompt:
+  - name: ssh_ip
+    prompt: "Allow SSH from IP"
+    private: false
 
   tasks:
   - name: Add SSH keys to user {{ ansible_user_id }}
@@ -54,8 +59,6 @@
           owner: root
           group: root
           mode: "0600"
-        vars:
-          ssh_ip: "192.0.2.1"
 
   - name: Set timezone
     timezone:
