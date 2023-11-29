@@ -1,0 +1,62 @@
+# ansible-playbook playbook.yaml -u johan --inventory 192.0.2.254, --ask-pass --ask-become-pass
+---
+- name: Install nginx and setup TLS template
+  gather_facts: yes
+  hosts: all
+  become: yes
+  become_user: root
+  become_method: su
+
+  vars_prompt:
+  - name: http_hostname
+    prompt: "HTTP hostname (e.g. www.example.com)"
+    private: false
+
+  tasks:
+  - name: Install packages
+    apt:
+      name:
+        - nginx
+        - ca-certificates
+      state: latest
+      update-cache: yes
+
+  - name: Enable nginx.service
+    systemd_service:
+      name: nginx
+      enabled: true
+
+  - name: Upload certificate
+    copy:
+      src: "{{ item.src }}"
+      dest: "/etc/ssl/{{ item.dest }}"
+      owner: root
+      group: root
+      mode: "{{ item.mode }}"
+    with_items:
+      - { src: "secret/cert.pem", dest: "certs/cert.pem", mode: "0644" }
+      - { src: "secret/cert.key", dest: "private/cert.key", mode: "0400" }
+
+  - name: Remove default nginx server
+    file:
+      path: /etc/nginx/sites-enabled/default
+      state: absent
+
+  - name: Create nginx server configuration
+    block:
+      - name: Create nginx server configuration
+        template:
+          src: configs/nginx.j2
+          dest: "/etc/nginx/sites-available/{{ http_hostname }}"
+          owner: root
+          group: root
+          mode: "0644"
+      - name: Create nginx configuration symlink
+        file:
+          src: "/etc/nginx/sites-available/{{ http_hostname }}"
+          dest: "/etc/nginx/sites-enabled/{{ http_hostname }}"
+          state: link
+
+  - name: All done
+    debug:
+      msg: "All done, remember to add firewall rules and finish nginx config"
