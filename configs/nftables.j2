@@ -1,0 +1,30 @@
+#!/usr/bin/nft -f
+
+flush ruleset
+
+table inet filter {
+	chain input {
+		type filter hook input priority 0; policy drop;
+		iif "lo" counter accept
+		ct state { related, established } counter accept
+		ct state invalid counter drop
+		ip protocol icmp counter accept
+		ip6 nexthdr icmpv6 counter accept
+		tcp dport 22 ct state { new, established } counter jump ssh
+		counter comment "dropped packets"
+	}
+
+	chain forward {
+		type filter hook forward priority 0; policy drop;
+		counter comment "dropped packets"
+	}
+
+	chain output {
+		type filter hook output priority 0; policy accept;
+	}
+
+	chain ssh {
+		ip saddr {{ ssh_ip }} counter accept comment ""
+		counter reject
+	}
+}

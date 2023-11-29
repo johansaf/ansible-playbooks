@@ -1,0 +1,66 @@
+# ansible-playbook playbook.yaml -u johan --inventory 192.0.2.254, --ask-pass --ask-become-pass --extra-vars "ssh_ip=192.0.2.1"
+---
+- name: Initial Setup (Debian)
+  gather_facts: yes
+  hosts: all
+  become: yes
+  become_user: root
+  become_method: su
+
+  tasks:
+  - name: Add SSH keys to user
+    authorized_key:
+      user: "{{ ansible_user_id }}"
+      state: present
+      exclusive: yes
+      key: "{% for key in lookup('fileglob', 'keys/*.pub').split(',') %}{{ lookup('file', key) ~ '\n'}}{% endfor %}"
+
+  - name: Upgrade packages
+    apt:
+      name: "*"
+      state: latest
+      update-cache: yes
+
+  - name: Setup sudo
+    block:
+      - name: Install sudo
+        apt:
+          name: sudo
+          state: present
+      - name: Adding user {{ ansible_user_id }} to sudo group
+        user:
+          name: "{{ ansible_user_id }}"
+          groups: sudo
+          append: yes
+
+  - name: Copy sshd_config
+    copy:
+      src: configs/sshd_config.conf
+      dest: /etc/ssh/sshd_config.d/sshd_config.conf
+      owner: root
+      group: root
+      mode: "0644"
+
+  - name: Setup nftables
+    block:
+      - name: Enable nftables.service
+        systemd_service:
+          name: nftables
+          enabled: true
+      - name: Copy nftables rules
+        template:
+          src: configs/nftables.j2
+          dest: /etc/nftables.conf
+          owner: root
+          group: root
+          mode: "0600"
+        vars:
+          ssh_ip: "192.0.2.1"
+
+  - name: Set timezone
+    timezone:
+      name: "Europe/Stockholm"
+
+  - name: Reboot the server
+    reboot:
+      msg: "Reboot after initial setup"
