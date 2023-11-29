@@ -1,0 +1,41 @@
+# ansible-playbook create_user.yaml -u johan --inventory 192.0.2.254, --ask-become-pass
+---
+- name: Create User
+  gather_facts: yes
+  hosts: all
+  become: yes
+  become_user: root
+  become_method: sudo
+
+  vars_prompt:
+  - name: username
+    prompt: "Username"
+    private: false
+  - name: full_name
+    prompt: "Full name"
+    private: false
+  - name: ssh_key
+    prompt: "SSH key"
+    private: false
+
+  tasks:
+  - name: Create user
+    user:
+      name: "{{ username }}"
+      password: "!"
+      shell: "/bin/bash"
+      comment: "{{ full_name }}"
+      state: present
+
+  - name: Add SSH key to user
+    authorized_key:
+      user: "{{ username }}"
+      state: present
+      exclusive: yes
+      key: "{{ ssh_key }}"
+
+  - name: Set permissions on homedir
+    file:
+      path: "/home/{{ username }}"
+      state: directory
+      mode: 0700
