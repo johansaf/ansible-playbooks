@@ -1,0 +1,33 @@
+---
+- name: Install syslog-ng and setup remote logging
+  gather_facts: yes
+  hosts: all
+  become: yes
+  become_user: root
+  become_method: sudo
+
+  vars_prompt:
+  - name: remote_log_ip
+    prompt: "Remote log IP"
+    private: false
+
+  tasks:
+  - name: Install packages
+    apt:
+      name:
+        - syslog-ng
+      state: latest
+      update-cache: yes
+
+  - name: Create syslog-ng remote log configuration
+    copy:
+      dest: "/etc/syslog-ng/conf.d/remote.conf"
+      content: |
+        destination d_net { udp("{{ remote_log_ip }}" port(514)); };
+        log { source(s_src); destination(d_net); };
+
+  - name: Restart syslog-ng.service
+    systemd_service:
+      name: syslog-ng
+      enabled: yes
+      state: restarted
